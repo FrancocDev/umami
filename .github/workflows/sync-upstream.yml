@@ -1,0 +1,50 @@
+name: Sync fork with upstream
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'FrancocDev/umami'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the fork's default branch
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Fast-forward from upstream when safe
+        run: |
+          set -euo pipefail
+
+          git remote add upstream https://github.com/umami-software/umami.git
+          git fetch --no-tags upstream master
+
+          fork_head="$(git rev-parse refs/remotes/origin/master)"
+          upstream_head="$(git rev-parse refs/remotes/upstream/master)"
+
+          if [[ "$fork_head" == "$upstream_head" ]]; then
+            echo "Fork is already up to date."
+          elif git merge-base --is-ancestor "$fork_head" "$upstream_head"; then
+            echo "Upstream is ahead; attempting a fast-forward-only push."
+            if git push origin "$upstream_head:refs/heads/master"; then
+              echo "Fork master was fast-forwarded to $upstream_head."
+            else
+              echo "::error::Fast-forward push failed or was rejected. No force push or merge was attempted; inspect the branch for a concurrent update or repository policy."
+              exit 1
+            fi
+          elif git merge-base --is-ancestor "$upstream_head" "$fork_head"; then
+            echo "::notice::The fork is ahead of upstream; no synchronization was needed."
+          else
+            echo "::warning::The fork and upstream have diverged. No push was attempted, so fork-specific commits were left untouched."
+          fi
