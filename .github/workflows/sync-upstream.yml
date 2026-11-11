@@ -15,10 +15,10 @@ concurrency:
 jobs:
   sync:
     if: github.repository == 'FrancocDev/umami'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out the fork's default branch
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           ref: master
           fetch-depth: 0
